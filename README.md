@@ -7,3 +7,8 @@ Data: https://www.sports-reference.com/cbb/seasons/YYYY-xx.html
 - advanced-opponent-stats
 
 Export to csv under Share & Export
+
+## Future
+- Find dataset for tournament teams and results
+- Function that plays all games
+- Define format for pick/record
