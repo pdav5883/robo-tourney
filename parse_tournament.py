@@ -15,8 +15,6 @@ base_url = "https://www.sports-reference.com/cbb/postseason/YYYY-ncaa.html"
 
 
 def parse_tournament(tournament_year):
-    # only works for 2007 and later -- before 2007 region names were by city
-
     tournament_url = base_url.replace("YYYY", str(tournament_year))
 
     req = requests.get(tournament_url)
@@ -29,17 +27,18 @@ def parse_tournament(tournament_year):
     region3_bs4 = brackets[2].find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
     region4_bs4 = brackets[3].find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
     final4_bs4 = brackets[4].find("div", {"id":"bracket", "class":"team4"}).find_all("div", {"class":"round"})
-
     
     region1 = parse_region(region1_bs4)
     region2 = parse_region(region2_bs4)
     region3 = parse_region(region3_bs4)
     region4 = parse_region(region4_bs4)
     final4 = parse_final4(final4_bs4)
+
+    regions = reorder_regions([region1, region2, region3, region4], final4)
     
     rounds = []
     
-    for reg1, reg2, reg3, reg4 in zip(region1, region2, region3, region4):
+    for reg1, reg2, reg3, reg4 in zip(regions[0], regions[1], regions[2], regions[3]):
         r = []
         r.extend(reg1)
         r.extend(reg2)
@@ -47,7 +46,7 @@ def parse_tournament(tournament_year):
         r.extend(reg4)
         rounds.append(r)
         
-    rounds.extend(reformat_final4(final4, rounds[-1]))
+    rounds.extend(final4)
         
     return rounds
 
@@ -111,45 +110,12 @@ def parse_team(team_bs4):
         return int(team[0]), team[1], 0
 
 
-def reformat_final4(final4, elite8):
-    # this flips the order of the final4 games/teams to follow formatting from previous rounds
-    semi1_team1, semi1_team2, semi1_result, semi1_location = final4[0][0]
-    semi2_team1, semi2_team2, semi2_result, semi2_location = final4[0][1]
-    final_team1, final_team2, final_result, final_location = final4[1][0]
+def reorder_regions(regions, final4):
+    # reorder regions based on final 4 ordering
+    regions_dict = {r[-1][0][r[-1][0][2]][1]:r for r in regions}
+    team1, team2, team3, team4  = final4[0][0][0][1], final4[0][0][1][1], final4[0][1][0][1], final4[0][1][1][1]
 
-    # the team names that should be first in semi1 and semi2
-    team1 = elite8[0][elite8[0][2]][1]
-    team3 = elite8[2][elite8[2][2]][1]
-
-    # switch game order for semi final, team order for final
-    if team1 not in (semi1_team1[1], semi1_team2[1]):
-        a_, b_, c_, d_ = semi1_team1, semi1_team2, semi1_result, semi1_location
-        semi1_team1, semi1_team2, semi1_result, semi1_location = semi2_team1, semi2_team2, semi2_result, semi2_location
-        semi2_team1, semi2_team2, semi2_result, semi2_lcoation = a_, b_, c_, d_
-
-        a_ = final_team1
-        final_team1 = final_team2
-        final_team2 = a_
-        final_result = 1 - final_result
-
-    # check if team order in each semi needs swapping
-    if team1 == semi1_team2[1]:
-        a_ = semi1_team1
-        semi1_team1 = semi1_team2
-        semi1_team2 = a_
-        semi1_result = 1 - semi1_result
-
-    if team3 == semi2_team2[1]:
-        a_ = semi2_team1
-        semi2_team1 = semi2_team2
-        semi2_team2 = a_
-        semi2_result = 1 - semi2_result
-
-    semi1 = (semi1_team1, semi1_team2, semi1_result, semi1_location)
-    semi2 = (semi2_team1, semi2_team2, semi2_result, semi2_location)
-    final = (final_team1, final_team2, final_result, final_location)
-
-    return [[semi1, semi2], [final]]
+    return [regions_dict[team1], regions_dict[team2], regions_dict[team3], regions_dict[team4]]
 
 
 if __name__ == "__main__":
