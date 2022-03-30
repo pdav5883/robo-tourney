@@ -12,3 +12,4 @@ Export to csv under Share & Export
 - Find dataset for tournament teams and results
 - Function that plays all games
 - Define format for pick/record
+- Do stats from previous years include data from NCAA tournament?
