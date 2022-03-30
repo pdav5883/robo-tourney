@@ -21,33 +21,36 @@ def parse_tournament(tournament_year):
 
     req = requests.get(tournament_url)
     tournament = BeautifulSoup(req.content, "html.parser")
-    
-    east_bs4 = tournament.find("div", {"id": "east"}).find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
-    south_bs4 = tournament.find("div", {"id": "south"}).find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
-    west_bs4 = tournament.find("div", {"id": "west"}).find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
-    midwest_bs4 = tournament.find("div", {"id": "midwest"}).find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
-    final4_bs4 = tournament.find("div", {"id": "national"}).find("div", {"id":"bracket", "class":"team4"}).find_all("div", {"class":"round"})
+    brackets = tournament.find("div", {"id": "brackets"}).find_all("div", recursive=False)
+
+    # order of region reflects config of regions in bracket
+    region1_bs4 = brackets[0].find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
+    region2_bs4 = brackets[1].find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
+    region3_bs4 = brackets[2].find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
+    region4_bs4 = brackets[3].find("div", {"id":"bracket", "class":"team16"}).find_all("div", {"class":"round"})
+    final4_bs4 = brackets[4].find("div", {"id":"bracket", "class":"team4"}).find_all("div", {"class":"round"})
 
     
-    east = parse_region(east_bs4)
-    south = parse_region(south_bs4)
-    west = parse_region(west_bs4)
-    midwest = parse_region(midwest_bs4)
+    region1 = parse_region(region1_bs4)
+    region2 = parse_region(region2_bs4)
+    region3 = parse_region(region3_bs4)
+    region4 = parse_region(region4_bs4)
     final4 = parse_final4(final4_bs4)
     
     rounds = []
     
-    for er, sr, wr, mr in zip(east, south, west, midwest):
+    for reg1, reg2, reg3, reg4 in zip(region1, region2, region3, region4):
         r = []
-        r.extend(er)
-        r.extend(sr)
-        r.extend(wr)
-        r.extend(mr)
+        r.extend(reg1)
+        r.extend(reg2)
+        r.extend(reg3)
+        r.extend(reg4)
         rounds.append(r)
         
-    rounds.extend(final4)
+    rounds.extend(reformat_final4(final4, rounds[-1]))
         
     return rounds
+
 
 def parse_region(region_bs4):
     round64, round32, round16, round8 = region_bs4[0], region_bs4[1], region_bs4[2], region_bs4[3]
@@ -106,6 +109,47 @@ def parse_team(team_bs4):
         return int(team[0]), team[1], int(team[2])
     except IndexError:
         return int(team[0]), team[1], 0
+
+
+def reformat_final4(final4, elite8):
+    # this flips the order of the final4 games/teams to follow formatting from previous rounds
+    semi1_team1, semi1_team2, semi1_result, semi1_location = final4[0][0]
+    semi2_team1, semi2_team2, semi2_result, semi2_location = final4[0][1]
+    final_team1, final_team2, final_result, final_location = final4[1][0]
+
+    # the team names that should be first in semi1 and semi2
+    team1 = elite8[0][elite8[0][2]][1]
+    team3 = elite8[2][elite8[2][2]][1]
+
+    # switch game order for semi final, team order for final
+    if team1 not in (semi1_team1[1], semi1_team2[1]):
+        a_, b_, c_, d_ = semi1_team1, semi1_team2, semi1_result, semi1_location
+        semi1_team1, semi1_team2, semi1_result, semi1_location = semi2_team1, semi2_team2, semi2_result, semi2_location
+        semi2_team1, semi2_team2, semi2_result, semi2_lcoation = a_, b_, c_, d_
+
+        a_ = final_team1
+        final_team1 = final_team2
+        final_team2 = a_
+        final_result = 1 - final_result
+
+    # check if team order in each semi needs swapping
+    if team1 == semi1_team2[1]:
+        a_ = semi1_team1
+        semi1_team1 = semi1_team2
+        semi1_team2 = a_
+        semi1_result = 1 - semi1_result
+
+    if team3 == semi2_team2[1]:
+        a_ = semi2_team1
+        semi2_team1 = semi2_team2
+        semi2_team2 = a_
+        semi2_result = 1 - semi2_result
+
+    semi1 = (semi1_team1, semi1_team2, semi1_result, semi1_location)
+    semi2 = (semi2_team1, semi2_team2, semi2_result, semi2_location)
+    final = (final_team1, final_team2, final_result, final_location)
+
+    return [[semi1, semi2], [final]]
 
 
 if __name__ == "__main__":
